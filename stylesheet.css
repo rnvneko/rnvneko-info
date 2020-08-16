@@ -1,0 +1,38 @@
+.container {
+text-align: center;
+font-family: 'Kosugi Maru', sans-serif;
+color: gray;
+}
+
+.snslink {
+margin: auto;
+text-align: center;
+font-family: 'Kosugi Maru', sans-serif;
+color: royalblue;
+}
+
+hr {
+border-width: 1px 1px 1px 1px;
+border-style: solid;
+border-color: gray;
+height: 5px;
+width: 50%;
+}
+
+.main {
+font-size: 20px
+}
+
+.mainicon {
+width: 128px;
+height: 128px;
+vertical-align: middle;
+margin-right: 10px;
+}
+
+.icon {
+width: 32px;
+height: 32px;
+vertical-align: middle;
+margin-right: 1px;
+}
