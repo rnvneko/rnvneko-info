@@ -11,6 +11,10 @@ font-family: 'Kosugi Maru', sans-serif;
 color: royalblue;
 }
 
+.sns :hover {
+background-color: silver;
+}
+
 hr {
 border-style: none;
 background-color: gray;
@@ -30,6 +34,7 @@ margin-right: 10px;
 }
 
 .icon {
+border-radius: 50%;
 width: 32px;
 height: 32px;
 vertical-align: middle;
