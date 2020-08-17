@@ -17,6 +17,10 @@ color: steelblue;
 font-weight: bolder;
 }
 
+.link:hover {
+background-color: silver;
+}
+
 .main {
 font-size: 18px
 }
@@ -29,7 +33,7 @@ color: royalblue;
 font-size: 20px;
 }
 
-.sns :hover {
+.sns:hover {
 background-color: silver;
 }
 
@@ -54,3 +58,4 @@ height: 32px;
 vertical-align: middle;
 margin-right: 1px;
 }
+
