@@ -3,14 +3,25 @@
   src: url("03SmartFontUI.ttf");
 }
 
+h1 {
+font-size: 1.3em;
+}
+
+body {
+font-size: large;
+}
+
 .container {
-max-width: 600px;
+max-width: 650px;
 margin: 0 auto;
 padding: 1.8em;
 text-align: center;
 font-family: 'SmartFontUI', sans-serif;
 color: black;
-font-size: 15px;
+}
+
+.title {
+white-space: nowrap;
 }
 
 .emphasis {
@@ -22,16 +33,12 @@ font-weight: bolder;
 background-color: silver;
 }
 
-.main {
-font-size: 18px
-}
-
 .snslink {
 width: 180px;
 margin: auto;
 font-family: 'SmartFontUI', sans-serif;
 color: royalblue;
-font-size: 20px;
+text-align: left;
 }
 
 .sns:hover {
@@ -46,8 +53,8 @@ width: 100%;
 }
 
 .mainicon {
-width: 128px;
-height: 128px;
+width: 110px;
+height: 110px;
 vertical-align: middle;
 margin-right: 10px;
 }
