@@ -4,7 +4,7 @@
 }
 
 .container {
-width: 800px;
+max-widh: 800px;
 margin: auto;
 text-align: center;
 font-family: 'SmartFontUI', sans-serif;
@@ -41,7 +41,7 @@ hr {
 border-style: none;
 background-color: gainsboro;
 height: 2px;
-width: 100%;
+width: 50%;
 }
 
 .mainicon {
@@ -58,4 +58,3 @@ height: 32px;
 vertical-align: middle;
 margin-right: 1px;
 }
-
