@@ -29,15 +29,20 @@ color: steelblue;
 font-weight: bolder;
 }
 
+.bolder {
+color: royalblue;
+font-weight: bolder;
+}
+
 .link:hover {
 background-color: silver;
 }
 
 .snslink {
-width: 180px;
+width: 265px;
 margin: auto;
 font-family: 'SmartFontUI', sans-serif;
-color: royalblue;
+color: cornflowerblue;
 text-align: left;
 }
 
