@@ -1,14 +1,32 @@
+@font-face {
+  font-family: "SmartFontUI";
+  src: url("03SmartFontUI.ttf");
+}
+
 .container {
+width: 800px;
+margin: auto;
 text-align: center;
-font-family: 'Kosugi Maru', sans-serif;
-color: dimgray;
+font-family: 'SmartFontUI', sans-serif;
+color: black;
+font-size: 15px;
+}
+
+.emphasis {
+color: steelblue;
+font-weight: bolder;
+}
+
+.main {
+font-size: 18px
 }
 
 .snslink {
-width: 220px;
+width: 180px;
 margin: auto;
-font-family: 'Kosugi Maru', sans-serif;
+font-family: 'SmartFontUI', sans-serif;
 color: royalblue;
+font-size: 20px;
 }
 
 .sns :hover {
@@ -17,13 +35,9 @@ background-color: silver;
 
 hr {
 border-style: none;
-background-color: gray;
+background-color: gainsboro;
 height: 2px;
-width: 90%;
-}
-
-.main {
-font-size: 20px
+width: 100%;
 }
 
 .mainicon {
