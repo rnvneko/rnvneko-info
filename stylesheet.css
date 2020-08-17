@@ -1,22 +1,21 @@
 .container {
 text-align: center;
 font-family: 'Kosugi Maru', sans-serif;
-color: gray;
+color: dimgray;
 }
 
 .snslink {
+width: 220px;
 margin: auto;
-text-align: center;
 font-family: 'Kosugi Maru', sans-serif;
 color: royalblue;
 }
 
 hr {
-border-width: 1px 1px 1px 1px;
-border-style: solid;
-border-color: gray;
-height: 5px;
-width: 50%;
+border-style: none;
+background-color: gray;
+height: 2px;
+width: 90%;
 }
 
 .main {
