@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blog - rnvneko info</title>
+    <link rel="shortcut icon" href="favicon.ico">
+    <link href="https://fonts.googleapis.com/css2?family=Kosugi+Maru&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="stylesheet.css">
+    <!-- marked.js for markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
+    <!-- highlight.js for code blocks -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/highlight.min.js"></script>
+</head>
+<body>
+
+    <nav class="navbar" id="navbar">
+        <div class="nav-inner">
+            <a href="index.html" class="nav-brand">
+                <img src="rnvneko.png" alt="rnvneko" class="nav-avatar">
+                <span>rnvneko</span>
+            </a>
+            <ul class="nav-menu" id="navMenu">
+                <li><a href="index.html#about" class="nav-link">About</a></li>
+                <li><a href="index.html#links" class="nav-link">Links</a></li>
+                <li><a href="blog.html" class="nav-link">Blog</a></li>
+                <li><a href="index.html#reviews" class="nav-link">Reviews</a></li>
+            </ul>
+            <button class="nav-toggle" id="navToggle" aria-label="メニュー">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+    </nav>
+
+    <div id="post-hero" class="post-page-hero" style="display:none;">
+        <div class="post-page-hero-inner">
+            <div class="post-tags" id="post-tags" style="margin-bottom:16px;"></div>
+            <h1 class="post-page-title" id="post-title"></h1>
+            <div class="post-page-meta">
+                <span id="post-date"></span>
+            </div>
+        </div>
+    </div>
+
+    <div id="post-body" class="post-body">
+        <p class="state-msg">読み込み中...</p>
+    </div>
+
+    <!-- Back link -->
+    <div style="max-width:760px;margin:0 auto;padding:0 24px 60px;">
+        <a href="blog.html" class="btn btn-outline">← ブログ一覧に戻る</a>
+    </div>
+
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2024 rnvneko</p>
+        </div>
+    </footer>
+
+    <script>
+    // Navbar
+    const navbar = document.getElementById('navbar');
+    const navToggle = document.getElementById('navToggle');
+    const navMenu = document.getElementById('navMenu');
+
+    window.addEventListener('scroll', () => navbar.classList.toggle('scrolled', window.scrollY > 40));
+    navToggle.addEventListener('click', () => {
+        navMenu.classList.toggle('open');
+        navToggle.classList.toggle('open');
+    });
+
+    function esc(s) {
+        return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function fmtDate(d) {
+        return new Date(d).toLocaleDateString('ja-JP', { year:'numeric', month:'long', day:'numeric' });
+    }
+
+    // Configure marked
+    marked.setOptions({
+        breaks: true,
+        gfm: true,
+    });
+
+    // Custom renderer for code blocks
+    const renderer = new marked.Renderer();
+    renderer.code = function(code, lang) {
+        const language = hljs.getLanguage(lang) ? lang : 'plaintext';
+        const highlighted = hljs.highlight(typeof code === 'object' ? code.text : code, { language }).value;
+        return `<pre><code class="hljs language-${language}">${highlighted}</code></pre>`;
+    };
+
+    marked.use({ renderer });
+
+    async function loadPost() {
+        const params = new URLSearchParams(window.location.search);
+        const slug = params.get('slug');
+
+        if (!slug) {
+            document.getElementById('post-body').innerHTML = '<p class="state-msg">記事が見つかりませんでした。</p>';
+            return;
+        }
+
+        try {
+            const res = await fetch('data/posts.json');
+            if (!res.ok) throw new Error();
+            const data = await res.json();
+            const post = (data.posts || []).find(p => p.slug === slug);
+
+            if (!post) {
+                document.getElementById('post-body').innerHTML = '<p class="state-msg">記事が見つかりませんでした。</p>';
+                return;
+            }
+
+            // Update page title
+            document.title = post.title + ' - rnvneko info';
+
+            // Hero
+            const hero = document.getElementById('post-hero');
+            hero.style.display = 'block';
+
+            document.getElementById('post-tags').innerHTML = (post.tags || []).map(t => `<span class="tag">${esc(t)}</span>`).join('');
+            document.getElementById('post-title').textContent = post.title;
+            document.getElementById('post-date').textContent = fmtDate(post.date);
+
+            // Body
+            const html = marked.parse(post.content || '');
+            document.getElementById('post-body').innerHTML = html;
+
+        } catch {
+            document.getElementById('post-body').innerHTML = '<p class="state-msg">記事の読み込みに失敗しました。</p>';
+        }
+    }
+
+    loadPost();
+    </script>
+</body>
+</html>

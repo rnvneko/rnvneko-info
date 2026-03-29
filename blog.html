@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blog - rnvneko info</title>
+    <link rel="shortcut icon" href="favicon.ico">
+    <link href="https://fonts.googleapis.com/css2?family=Kosugi+Maru&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="stylesheet.css">
+</head>
+<body>
+
+    <nav class="navbar" id="navbar">
+        <div class="nav-inner">
+            <a href="index.html" class="nav-brand">
+                <img src="rnvneko.png" alt="rnvneko" class="nav-avatar">
+                <span>rnvneko</span>
+            </a>
+            <ul class="nav-menu" id="navMenu">
+                <li><a href="index.html#about" class="nav-link">About</a></li>
+                <li><a href="index.html#links" class="nav-link">Links</a></li>
+                <li><a href="blog.html" class="nav-link">Blog</a></li>
+                <li><a href="index.html#reviews" class="nav-link">Reviews</a></li>
+            </ul>
+            <button class="nav-toggle" id="navToggle" aria-label="メニュー">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+    </nav>
+
+    <div class="page-hero">
+        <h1 class="page-hero-title">Blog</h1>
+        <p class="page-hero-sub">rnvnekoのブログ</p>
+    </div>
+
+    <main>
+        <section class="section">
+            <div class="container">
+
+                <!-- Search / Filter -->
+                <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:28px;align-items:center;">
+                    <input type="text" id="searchInput" class="form-input" placeholder="記事を検索..." style="max-width:300px;">
+                    <div id="tagFilter" class="post-tags" style="gap:8px;flex-wrap:wrap;"></div>
+                </div>
+
+                <div id="blog-posts" class="posts-grid">
+                    <p class="state-msg">読み込み中...</p>
+                </div>
+
+                <!-- Pagination -->
+                <div id="pagination" style="display:flex;justify-content:center;gap:8px;margin-top:40px;flex-wrap:wrap;"></div>
+
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2024 rnvneko</p>
+        </div>
+    </footer>
+
+    <script>
+    // Navbar
+    const navbar = document.getElementById('navbar');
+    const navToggle = document.getElementById('navToggle');
+    const navMenu = document.getElementById('navMenu');
+
+    window.addEventListener('scroll', () => navbar.classList.toggle('scrolled', window.scrollY > 40));
+    navToggle.addEventListener('click', () => {
+        navMenu.classList.toggle('open');
+        navToggle.classList.toggle('open');
+    });
+
+    // Scroll animation
+    const observer = new IntersectionObserver(entries => {
+        entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); } });
+    }, { threshold: 0.08 });
+
+    // Utils
+    function esc(s) {
+        return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function fmtDate(d) {
+        return new Date(d).toLocaleDateString('ja-JP', { year:'numeric', month:'long', day:'numeric' });
+    }
+
+    const PER_PAGE = 9;
+    let allPosts = [];
+    let currentTag = null;
+    let currentPage = 1;
+    let searchQuery = '';
+
+    function filteredPosts() {
+        return allPosts.filter(p => {
+            const matchTag = !currentTag || (p.tags || []).includes(currentTag);
+            const q = searchQuery.toLowerCase();
+            const matchSearch = !q ||
+                (p.title || '').toLowerCase().includes(q) ||
+                (p.summary || '').toLowerCase().includes(q) ||
+                (p.tags || []).some(t => t.toLowerCase().includes(q));
+            return matchTag && matchSearch;
+        });
+    }
+
+    function renderPosts() {
+        const posts = filteredPosts();
+        const el = document.getElementById('blog-posts');
+        const total = posts.length;
+        const totalPages = Math.ceil(total / PER_PAGE) || 1;
+        currentPage = Math.min(currentPage, totalPages);
+        const slice = posts.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
+
+        if (!slice.length) {
+            el.innerHTML = '<p class="state-msg">記事が見つかりませんでした</p>';
+        } else {
+            el.innerHTML = slice.map(p => `
+                <a href="post.html?slug=${esc(p.slug)}" class="post-card glass-card fade-in">
+                    <div class="post-meta">
+                        <span class="post-date">${fmtDate(p.date)}</span>
+                        <div class="post-tags">${(p.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div>
+                    </div>
+                    <div class="post-title">${esc(p.title)}</div>
+                    <div class="post-summary">${esc(p.summary||'')}</div>
+                </a>
+            `).join('');
+            el.querySelectorAll('.fade-in').forEach(e => observer.observe(e));
+        }
+
+        // Pagination
+        const pg = document.getElementById('pagination');
+        if (totalPages <= 1) { pg.innerHTML = ''; return; }
+        pg.innerHTML = Array.from({length: totalPages}, (_, i) => i + 1).map(n => `
+            <button onclick="goPage(${n})" class="btn ${n === currentPage ? 'btn-primary' : 'btn-outline'} btn-sm">${n}</button>
+        `).join('');
+    }
+
+    function goPage(n) {
+        currentPage = n;
+        renderPosts();
+        window.scrollTo({ top: 200, behavior: 'smooth' });
+    }
+
+    function renderTagFilter(posts) {
+        const tags = [...new Set(posts.flatMap(p => p.tags || []))].sort();
+        const el = document.getElementById('tagFilter');
+        el.innerHTML = tags.map(t => `
+            <button onclick="filterTag('${esc(t)}')" class="tag" id="tag-${esc(t)}" style="cursor:pointer;border:none;font-family:inherit;">${esc(t)}</button>
+        `).join('');
+    }
+
+    function filterTag(tag) {
+        currentTag = currentTag === tag ? null : tag;
+        currentPage = 1;
+        document.querySelectorAll('#tagFilter .tag').forEach(el => {
+            const isActive = el.textContent === currentTag;
+            el.style.background = isActive ? 'var(--primary)' : '';
+            el.style.color = isActive ? 'white' : '';
+        });
+        renderPosts();
+    }
+
+    document.getElementById('searchInput').addEventListener('input', e => {
+        searchQuery = e.target.value;
+        currentPage = 1;
+        renderPosts();
+    });
+
+    async function init() {
+        const el = document.getElementById('blog-posts');
+        try {
+            const res = await fetch('data/posts.json');
+            if (!res.ok) throw new Error();
+            const data = await res.json();
+            allPosts = (data.posts || []).sort((a,b) => new Date(b.date) - new Date(a.date));
+            renderTagFilter(allPosts);
+            renderPosts();
+        } catch {
+            el.innerHTML = '<p class="state-msg">記事の読み込みに失敗しました</p>';
+        }
+    }
+
+    init();
+    </script>
+</body>
+</html>
