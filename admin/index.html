@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - rnvneko info</title>
+    <link href="https://fonts.googleapis.com/css2?family=Kosugi+Maru&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../stylesheet.css">
+    <!-- EasyMDE markdown editor -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/easymde@2/dist/easymde.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/easymde@2/dist/easymde.min.js"></script>
+    <!-- marked.js for preview -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
+</head>
+<body>
+
+<!-- ===== Login Screen ===== -->
+<div id="loginScreen" class="login-wrap">
+    <div class="login-card">
+        <img src="../rnvneko.png" alt="rnvneko" class="login-logo">
+        <h1 class="login-title">管理画面</h1>
+        <p class="login-sub">rnvneko info admin</p>
+        <div id="loginAlert"></div>
+        <div class="form-group" style="text-align:left;">
+            <label class="form-label">パスワード</label>
+            <input type="password" id="loginPassword" class="form-input" placeholder="パスワードを入力" autofocus>
+        </div>
+        <button onclick="doLogin()" class="btn btn-primary" style="width:100%;">ログイン</button>
+        <p style="font-size:0.75em;color:var(--text-muted);margin-top:20px;">
+            初回ログイン後、設定画面でGitHub トークンを設定してください。
+        </p>
+    </div>
+</div>
+
+<!-- ===== Admin Screens ===== -->
+<div id="adminWrap" class="admin-wrap" style="display:none;">
+
+    <div class="admin-topbar">
+        <span class="admin-topbar-title">📝 rnvneko admin</span>
+        <div class="admin-topbar-actions">
+            <button onclick="showScreen('settings')" class="btn btn-ghost btn-sm">⚙ 設定</button>
+            <button onclick="doLogout()" class="btn btn-ghost btn-sm">ログアウト</button>
+        </div>
+    </div>
+
+    <div class="admin-container">
+
+        <!-- List screen -->
+        <div id="listScreen" class="admin-screen active">
+            <div class="admin-card">
+                <div class="admin-card-header">
+                    <span class="admin-card-title">ブログ記事一覧</span>
+                    <button onclick="showEditor(null)" class="btn btn-primary btn-sm">＋ 新規作成</button>
+                </div>
+                <div id="postList">
+                    <p style="color:var(--text-muted);text-align:center;padding:32px;">読み込み中...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Editor screen -->
+        <div id="editorScreen" class="admin-screen">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
+                <button onclick="showScreen('list')" class="btn btn-outline btn-sm">← 一覧に戻る</button>
+                <h2 style="font-size:1.1em;font-weight:700;color:var(--primary-dark);" id="editorTitle">新規記事</h2>
+            </div>
+            <div id="saveAlert"></div>
+            <div class="admin-card">
+                <div class="form-group">
+                    <label class="form-label">タイトル <span style="color:#e53e3e;">*</span></label>
+                    <input type="text" id="postTitle" class="form-input" placeholder="記事のタイトル">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">スラッグ（URL）<span style="color:#e53e3e;">*</span></label>
+                        <input type="text" id="postSlug" class="form-input" placeholder="my-post-title">
+                        <p class="form-hint">英数字とハイフンのみ。自動生成されます。</p>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">公開日</label>
+                        <input type="date" id="postDate" class="form-input">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">タグ</label>
+                    <input type="text" id="postTags" class="form-input" placeholder="タグ1, タグ2, タグ3（カンマ区切り）">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">概要（一覧表示用）</label>
+                    <input type="text" id="postSummary" class="form-input" placeholder="記事の概要（省略可）">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">本文（Markdown）<span style="color:#e53e3e;">*</span></label>
+                    <textarea id="postContent"></textarea>
+                </div>
+                <div style="display:flex;gap:10px;justify-content:flex-end;padding-top:8px;">
+                    <button onclick="showScreen('list')" class="btn btn-outline">キャンセル</button>
+                    <button onclick="savePost()" class="btn btn-primary" id="saveBtn">保存する</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings screen -->
+        <div id="settingsScreen" class="admin-screen">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
+                <button onclick="showScreen('list')" class="btn btn-outline btn-sm">← 一覧に戻る</button>
+                <h2 style="font-size:1.1em;font-weight:700;color:var(--primary-dark);">設定</h2>
+            </div>
+            <div class="admin-card">
+                <div class="admin-card-header">
+                    <span class="admin-card-title">GitHub 設定</span>
+                </div>
+                <p style="font-size:0.85em;color:var(--text-muted);margin-bottom:20px;">
+                    記事の保存にはGitHub Personal Access Token (PAT) が必要です。<br>
+                    <strong>Settings → Developer settings → Personal access tokens → Fine-grained tokens</strong> から作成し、<code>rnvneko-info</code> リポジトリへの <strong>Contents: Read and write</strong> 権限を付与してください。
+                </p>
+                <div class="form-group">
+                    <label class="form-label">GitHub Personal Access Token</label>
+                    <input type="password" id="ghToken" class="form-input" placeholder="github_pat_XXXXXXX">
+                    <p class="form-hint">ブラウザのlocalStorageに保存されます。共有PCでは使用しないでください。</p>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">リポジトリ</label>
+                    <input type="text" id="ghRepo" class="form-input" value="rnvneko/rnvneko-info" readonly>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">ブランチ</label>
+                    <input type="text" id="ghBranch" class="form-input" placeholder="main">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">パスワード変更</label>
+                    <input type="password" id="newPassword" class="form-input" placeholder="新しいパスワード（空欄で変更しない）">
+                </div>
+                <div id="settingsAlert"></div>
+                <button onclick="saveSettings()" class="btn btn-primary">設定を保存</button>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+// ===== Constants =====
+const REPO = 'rnvneko/rnvneko-info';
+const FILE_PATH = 'data/posts.json';
+
+// ===== Auth =====
+const DEFAULT_PASS_HASH = '5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8'; // "password"
+// To change default password: SHA-256 hash of your password
+
+function sha256(str) {
+    const buf = new TextEncoder().encode(str);
+    return crypto.subtle.digest('SHA-256', buf).then(b => {
+        return Array.from(new Uint8Array(b)).map(x => x.toString(16).padStart(2,'0')).join('');
+    });
+}
+
+function getStoredHash() {
+    return localStorage.getItem('adminPassHash') || DEFAULT_PASS_HASH;
+}
+
+function isLoggedIn() {
+    return sessionStorage.getItem('adminAuth') === '1';
+}
+
+async function doLogin() {
+    const pw = document.getElementById('loginPassword').value;
+    if (!pw) return;
+    const hash = await sha256(pw);
+    if (hash === getStoredHash()) {
+        sessionStorage.setItem('adminAuth', '1');
+        showAdmin();
+    } else {
+        showAlert('loginAlert', 'パスワードが間違っています', 'error');
+    }
+}
+
+document.getElementById('loginPassword').addEventListener('keydown', e => {
+    if (e.key === 'Enter') doLogin();
+});
+
+function doLogout() {
+    sessionStorage.removeItem('adminAuth');
+    location.reload();
+}
+
+// ===== Settings =====
+function getToken() { return localStorage.getItem('ghToken') || ''; }
+function getBranch() { return localStorage.getItem('ghBranch') || 'main'; }
+
+function saveSettings() {
+    const token = document.getElementById('ghToken').value.trim();
+    const branch = document.getElementById('ghBranch').value.trim() || 'main';
+    const newPw = document.getElementById('newPassword').value;
+
+    if (token) localStorage.setItem('ghToken', token);
+    localStorage.setItem('ghBranch', branch);
+
+    if (newPw) {
+        sha256(newPw).then(hash => {
+            localStorage.setItem('adminPassHash', hash);
+            showAlert('settingsAlert', '設定を保存しました（パスワードも更新しました）', 'success');
+        });
+    } else {
+        showAlert('settingsAlert', '設定を保存しました', 'success');
+    }
+}
+
+// ===== GitHub API =====
+async function ghGet(path) {
+    const token = getToken();
+    const headers = { 'Accept': 'application/vnd.github+json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(`https://api.github.com/repos/${REPO}/contents/${path}?ref=${getBranch()}`, { headers });
+    if (!res.ok) throw new Error(`GitHub API error: ${res.status}`);
+    return res.json();
+}
+
+async function ghPut(path, content, sha, message) {
+    const token = getToken();
+    if (!token) throw new Error('GitHub Token が設定されていません。設定画面でトークンを入力してください。');
+    const headers = {
+        'Accept': 'application/vnd.github+json',
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+    };
+    const body = {
+        message,
+        content: btoa(unescape(encodeURIComponent(content))),
+        branch: getBranch(),
+    };
+    if (sha) body.sha = sha;
+    const res = await fetch(`https://api.github.com/repos/${REPO}/contents/${path}`, {
+        method: 'PUT', headers, body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || `GitHub API error: ${res.status}`);
+    }
+    return res.json();
+}
+
+// Cache
+let cachedData = null;
+let cachedSha = null;
+
+async function loadPostsData() {
+    try {
+        const file = await ghGet(FILE_PATH);
+        cachedSha = file.sha;
+        const json = JSON.parse(atob(file.content.replace(/\n/g,'')));
+        cachedData = json;
+        return json;
+    } catch (e) {
+        // File might not exist yet
+        if (e.message.includes('404')) {
+            cachedData = { posts: [] };
+            cachedSha = null;
+            return cachedData;
+        }
+        throw e;
+    }
+}
+
+async function savePostsData(data, message) {
+    const json = JSON.stringify(data, null, 2);
+    const result = await ghPut(FILE_PATH, json, cachedSha, message);
+    cachedSha = result.content.sha;
+    cachedData = data;
+}
+
+// ===== Screens =====
+function showScreen(name) {
+    document.querySelectorAll('.admin-screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(name + 'Screen').classList.add('active');
+    if (name === 'list') loadList();
+    if (name === 'settings') loadSettingsForm();
+}
+
+function showAlert(containerId, msg, type) {
+    const el = document.getElementById(containerId);
+    el.innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+    setTimeout(() => { el.innerHTML = ''; }, 4000);
+}
+
+// ===== List =====
+async function loadList() {
+    const el = document.getElementById('postList');
+    el.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:32px;">読み込み中...</p>';
+    try {
+        const data = await loadPostsData();
+        const posts = (data.posts || []).sort((a,b) => new Date(b.date) - new Date(a.date));
+        if (!posts.length) {
+            el.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:32px;">記事がまだありません</p>';
+            return;
+        }
+        el.innerHTML = posts.map(p => `
+            <div class="post-row">
+                <div class="post-row-info">
+                    <div class="post-row-title">${escHtml(p.title)}</div>
+                    <div class="post-row-meta">${fmtDate(p.date)} ／ ${(p.tags||[]).join(', ') || 'タグなし'}</div>
+                </div>
+                <div class="post-row-actions">
+                    <button onclick="showEditor('${escHtml(p.slug)}')" class="btn btn-outline btn-sm">編集</button>
+                    <button onclick="deletePost('${escHtml(p.slug)}')" class="btn btn-danger btn-sm">削除</button>
+                </div>
+            </div>
+        `).join('');
+    } catch (e) {
+        el.innerHTML = `<p style="color:#e53e3e;text-align:center;padding:32px;">${escHtml(e.message)}</p>`;
+    }
+}
+
+// ===== Editor =====
+let mde = null;
+let editingSlug = null;
+
+function showEditor(slug) {
+    editingSlug = slug;
+    document.getElementById('editorTitle').textContent = slug ? '記事を編集' : '新規記事';
+    document.getElementById('saveAlert').innerHTML = '';
+
+    // Reset form
+    document.getElementById('postTitle').value = '';
+    document.getElementById('postSlug').value = '';
+    document.getElementById('postDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('postTags').value = '';
+    document.getElementById('postSummary').value = '';
+
+    // Init EasyMDE
+    if (mde) { mde.toTextArea(); mde = null; }
+    document.getElementById('postContent').value = '';
+
+    mde = new EasyMDE({
+        element: document.getElementById('postContent'),
+        spellChecker: false,
+        autosave: { enabled: true, uniqueId: 'admin-draft' },
+        toolbar: [
+            'bold','italic','strikethrough','|',
+            'heading-2','heading-3','|',
+            'unordered-list','ordered-list','|',
+            'link','image','code','|',
+            'quote','horizontal-rule','|',
+            'preview','side-by-side','fullscreen','|',
+            'guide'
+        ],
+        placeholder: '本文をMarkdownで書いてください...',
+        minHeight: '320px',
+    });
+
+    // Auto-generate slug from title
+    document.getElementById('postTitle').addEventListener('input', function() {
+        if (!editingSlug) {
+            document.getElementById('postSlug').value = slugify(this.value);
+        }
+    });
+
+    // Fill in existing post data
+    if (slug && cachedData) {
+        const post = cachedData.posts.find(p => p.slug === slug);
+        if (post) {
+            document.getElementById('postTitle').value = post.title || '';
+            document.getElementById('postSlug').value = post.slug || '';
+            document.getElementById('postDate').value = post.date || '';
+            document.getElementById('postTags').value = (post.tags || []).join(', ');
+            document.getElementById('postSummary').value = post.summary || '';
+            mde.value(post.content || '');
+        }
+    }
+
+    showScreen('editor');
+}
+
+async function savePost() {
+    const title = document.getElementById('postTitle').value.trim();
+    const slug = document.getElementById('postSlug').value.trim();
+    const date = document.getElementById('postDate').value.trim();
+    const tags = document.getElementById('postTags').value.split(',').map(t=>t.trim()).filter(Boolean);
+    const summary = document.getElementById('postSummary').value.trim();
+    const content = mde ? mde.value() : '';
+
+    if (!title) { showAlert('saveAlert', 'タイトルを入力してください', 'error'); return; }
+    if (!slug)  { showAlert('saveAlert', 'スラッグを入力してください', 'error'); return; }
+    if (!content.trim()) { showAlert('saveAlert', '本文を入力してください', 'error'); return; }
+
+    const btn = document.getElementById('saveBtn');
+    btn.disabled = true;
+    btn.textContent = '保存中...';
+
+    try {
+        let data = cachedData;
+        if (!data) data = await loadPostsData();
+        const posts = data.posts || [];
+        const existing = posts.findIndex(p => p.slug === slug);
+        const post = { id: slug, slug, title, date, tags, summary, content };
+
+        if (existing >= 0) {
+            posts[existing] = post;
+        } else {
+            posts.push(post);
+        }
+
+        data.posts = posts;
+        await savePostsData(data, `${existing >= 0 ? 'Update' : 'Add'} post: ${title}`);
+
+        showAlert('saveAlert', '保存しました ✓', 'success');
+        setTimeout(() => showScreen('list'), 1200);
+    } catch (e) {
+        showAlert('saveAlert', '保存に失敗しました: ' + e.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '保存する';
+    }
+}
+
+async function deletePost(slug) {
+    if (!confirm(`「${slug}」を削除しますか？この操作は元に戻せません。`)) return;
+    try {
+        let data = cachedData;
+        if (!data) data = await loadPostsData();
+        data.posts = (data.posts || []).filter(p => p.slug !== slug);
+        await savePostsData(data, `Delete post: ${slug}`);
+        await loadList();
+    } catch (e) {
+        alert('削除に失敗しました: ' + e.message);
+    }
+}
+
+// ===== Settings Form =====
+function loadSettingsForm() {
+    const token = localStorage.getItem('ghToken') || '';
+    document.getElementById('ghToken').value = token ? '（設定済み）' : '';
+    document.getElementById('ghBranch').value = getBranch();
+    document.getElementById('newPassword').value = '';
+}
+
+// ===== Utils =====
+function slugify(str) {
+    return str.toLowerCase()
+        .replace(/[\s\u3000]+/g, '-')
+        .replace(/[^\w\-]/g, '')
+        .replace(/\-\-+/g, '-')
+        .replace(/^\-+|\-+$/g, '');
+}
+
+function escHtml(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function fmtDate(d) {
+    if (!d) return '';
+    return new Date(d).toLocaleDateString('ja-JP', { year:'numeric', month:'long', day:'numeric' });
+}
+
+// ===== Init =====
+function showAdmin() {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('adminWrap').style.display = 'block';
+    loadList();
+}
+
+if (isLoggedIn()) {
+    showAdmin();
+}
+</script>
+</body>
+</html>
