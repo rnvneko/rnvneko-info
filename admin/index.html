@@ -91,6 +91,8 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">本文（Markdown）<span style="color:#e53e3e;">*</span></label>
+                    <!-- 画像アップロード用hidden input -->
+                    <input type="file" id="imageFileInput" accept="image/*" style="display:none;">
                     <textarea id="postContent"></textarea>
                 </div>
                 <div style="display:flex;gap:10px;justify-content:flex-end;padding-top:8px;">
@@ -211,6 +213,20 @@ function saveSettings() {
     }
 }
 
+// ===== Base64 / UTF-8 変換 =====
+function b64DecodeUtf8(b64) {
+    // atob() はバイナリ文字列を返すだけ。TextDecoder でUTF-8として解釈する
+    const bytes = Uint8Array.from(atob(b64.replace(/\n/g, '')), c => c.charCodeAt(0));
+    return new TextDecoder('utf-8').decode(bytes);
+}
+
+function utf8ToB64(str) {
+    const bytes = new TextEncoder().encode(str);
+    let binary = '';
+    bytes.forEach(b => binary += String.fromCharCode(b));
+    return btoa(binary);
+}
+
 // ===== GitHub API =====
 async function ghGet(path) {
     const token = getToken();
@@ -231,9 +247,34 @@ async function ghPut(path, content, sha, message) {
     };
     const body = {
         message,
-        content: btoa(unescape(encodeURIComponent(content))),
+        content: utf8ToB64(content),
         branch: getBranch(),
     };
+    if (sha) body.sha = sha;
+    const res = await fetch(`https://api.github.com/repos/${REPO}/contents/${path}`, {
+        method: 'PUT', headers, body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || `GitHub API error: ${res.status}`);
+    }
+    return res.json();
+}
+
+// バイナリファイル（画像）をアップロード
+async function ghPutBinary(path, arrayBuffer, sha, message) {
+    const token = getToken();
+    if (!token) throw new Error('GitHub Token が設定されていません。');
+    const bytes = new Uint8Array(arrayBuffer);
+    let binary = '';
+    bytes.forEach(b => binary += String.fromCharCode(b));
+    const b64 = btoa(binary);
+    const headers = {
+        'Accept': 'application/vnd.github+json',
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+    };
+    const body = { message, content: b64, branch: getBranch() };
     if (sha) body.sha = sha;
     const res = await fetch(`https://api.github.com/repos/${REPO}/contents/${path}`, {
         method: 'PUT', headers, body: JSON.stringify(body),
@@ -253,7 +294,7 @@ async function loadPostsData() {
     try {
         const file = await ghGet(FILE_PATH);
         cachedSha = file.sha;
-        const json = JSON.parse(atob(file.content.replace(/\n/g,'')));
+        const json = JSON.parse(b64DecodeUtf8(file.content));
         cachedData = json;
         return json;
     } catch (e) {
@@ -344,22 +385,63 @@ function showEditor(slug) {
     if (mde) { mde.toTextArea(); mde = null; }
     document.getElementById('postContent').value = '';
 
+    // autosave キーをスラッグごとに分けることで記事間の内容混入を防ぐ
+    const autosaveId = 'admin-draft-' + (slug || 'new');
+    // 新規作成のとき前回の下書きをクリア
+    if (!slug) localStorage.removeItem('smde_' + autosaveId);
+
     mde = new EasyMDE({
         element: document.getElementById('postContent'),
         spellChecker: false,
-        autosave: { enabled: true, uniqueId: 'admin-draft' },
+        autosave: { enabled: true, uniqueId: autosaveId, delay: 3000 },
         toolbar: [
             'bold','italic','strikethrough','|',
             'heading-2','heading-3','|',
             'unordered-list','ordered-list','|',
-            'link','image','code','|',
+            'link','code','|',
             'quote','horizontal-rule','|',
+            {
+                name: 'upload-image',
+                action: () => document.getElementById('imageFileInput').click(),
+                className: 'fa fa-upload',
+                title: '画像をアップロード',
+                text: '📷',
+            },
+            '|',
             'preview','side-by-side','fullscreen','|',
             'guide'
         ],
         placeholder: '本文をMarkdownで書いてください...',
         minHeight: '320px',
     });
+
+    // 画像アップロード処理
+    const fileInput = document.getElementById('imageFileInput');
+    fileInput.value = '';
+    fileInput.onchange = async () => {
+        const file = fileInput.files[0];
+        if (!file) return;
+        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const path = `images/${Date.now()}_${safeName}`;
+        const insertBtn = document.querySelector('button[title="画像をアップロード"]');
+        if (insertBtn) insertBtn.textContent = '⏳';
+        try {
+            const buf = await file.arrayBuffer();
+            // 既存ファイルのshaを取得（なければ新規）
+            let existingSha = null;
+            try { existingSha = (await ghGet(path)).sha; } catch {}
+            await ghPutBinary(path, buf, existingSha, `Upload image: ${safeName}`);
+            const mdText = `![${safeName}](/${path})`;
+            const cursor = mde.codemirror.getCursor();
+            mde.codemirror.replaceRange(mdText + '\n', cursor);
+            showAlert('saveAlert', `画像をアップロードしました: ${path}`, 'success');
+        } catch (e) {
+            showAlert('saveAlert', '画像アップロード失敗: ' + e.message, 'error');
+        } finally {
+            if (insertBtn) insertBtn.textContent = '📷';
+            fileInput.value = '';
+        }
+    };
 
     // Auto-generate slug from title
     document.getElementById('postTitle').addEventListener('input', function() {
