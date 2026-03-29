@@ -145,8 +145,8 @@ const REPO = 'rnvneko/rnvneko-info';
 const FILE_PATH = 'data/posts.json';
 
 // ===== Auth =====
-const DEFAULT_PASS_HASH = '5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8'; // "password"
-// To change default password: SHA-256 hash of your password
+const DEFAULT_PASS_HASH = '5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8';
+// 初回ログイン後、設定画面でパスワードを必ず変更してください。
 
 function sha256(str) {
     const buf = new TextEncoder().encode(str);
@@ -298,14 +298,22 @@ async function loadList() {
             <div class="post-row">
                 <div class="post-row-info">
                     <div class="post-row-title">${escHtml(p.title)}</div>
-                    <div class="post-row-meta">${fmtDate(p.date)} ／ ${(p.tags||[]).join(', ') || 'タグなし'}</div>
+                    <div class="post-row-meta">${fmtDate(p.date)} ／ ${escHtml((p.tags||[]).join(', ') || 'タグなし')}</div>
                 </div>
                 <div class="post-row-actions">
-                    <button onclick="showEditor('${escHtml(p.slug)}')" class="btn btn-outline btn-sm">編集</button>
-                    <button onclick="deletePost('${escHtml(p.slug)}')" class="btn btn-danger btn-sm">削除</button>
+                    <button data-slug="${escHtml(p.slug)}" data-action="edit"  class="btn btn-outline btn-sm">編集</button>
+                    <button data-slug="${escHtml(p.slug)}" data-action="delete" class="btn btn-danger btn-sm">削除</button>
                 </div>
             </div>
         `).join('');
+        // data属性経由でイベントを委譲（onclick文字列インジェクション対策）
+        el.querySelectorAll('button[data-action]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const slug = btn.dataset.slug;
+                if (btn.dataset.action === 'edit')   showEditor(slug);
+                if (btn.dataset.action === 'delete') deletePost(slug);
+            });
+        });
     } catch (e) {
         el.innerHTML = `<p style="color:#e53e3e;text-align:center;padding:32px;">${escHtml(e.message)}</p>`;
     }

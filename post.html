@@ -9,6 +9,8 @@
     <link rel="stylesheet" href="stylesheet.css">
     <!-- marked.js for markdown rendering -->
     <script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
+    <!-- DOMPurify for XSS sanitization -->
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
     <!-- highlight.js for code blocks -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github.min.css">
     <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/highlight.min.js"></script>
@@ -125,9 +127,17 @@
             document.getElementById('post-title').textContent = post.title;
             document.getElementById('post-date').textContent = fmtDate(post.date);
 
-            // Body
-            const html = marked.parse(post.content || '');
-            document.getElementById('post-body').innerHTML = html;
+            // Body - DOMPurify で XSS を無害化してからレンダリング
+            const rawHtml = marked.parse(post.content || '');
+            document.getElementById('post-body').innerHTML = DOMPurify.sanitize(rawHtml, {
+                ALLOWED_TAGS: [
+                    'h1','h2','h3','h4','h5','h6','p','a','ul','ol','li',
+                    'blockquote','pre','code','em','strong','del','hr','br',
+                    'img','table','thead','tbody','tr','th','td','span','div',
+                ],
+                ALLOWED_ATTR: ['href','src','alt','class','title','target','rel'],
+                ALLOW_DATA_ATTR: false,
+            });
 
         } catch {
             document.getElementById('post-body').innerHTML = '<p class="state-msg">記事の読み込みに失敗しました。</p>';
