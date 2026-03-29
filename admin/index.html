@@ -188,12 +188,17 @@ function doLogout() {
 function getToken() { return localStorage.getItem('ghToken') || ''; }
 function getBranch() { return localStorage.getItem('ghBranch') || 'master'; }
 
+const TOKEN_PLACEHOLDER = '（設定済み）';
+
 function saveSettings() {
-    const token = document.getElementById('ghToken').value.trim();
+    const tokenInput = document.getElementById('ghToken').value.trim();
     const branch = document.getElementById('ghBranch').value.trim() || 'master';
     const newPw = document.getElementById('newPassword').value;
 
-    if (token) localStorage.setItem('ghToken', token);
+    // プレースホルダー文字列はトークンとして保存しない
+    if (tokenInput && tokenInput !== TOKEN_PLACEHOLDER) {
+        localStorage.setItem('ghToken', tokenInput);
+    }
     localStorage.setItem('ghBranch', branch);
 
     if (newPw) {
@@ -437,7 +442,10 @@ async function deletePost(slug) {
 // ===== Settings Form =====
 function loadSettingsForm() {
     const token = localStorage.getItem('ghToken') || '';
-    document.getElementById('ghToken').value = token ? '（設定済み）' : '';
+    const input = document.getElementById('ghToken');
+    // 入力欄は常に空にし、設定済みの場合はプレースホルダーで示す
+    input.value = '';
+    input.placeholder = token ? '（設定済み・変更する場合のみ入力）' : 'github_pat_XXXXXXX';
     document.getElementById('ghBranch').value = getBranch();
     document.getElementById('newPassword').value = '';
 }
