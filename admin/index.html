@@ -38,6 +38,8 @@
     <div class="admin-topbar">
         <span class="admin-topbar-title">📝 rnvneko admin</span>
         <div class="admin-topbar-actions">
+            <button onclick="showScreen('list')" class="btn btn-ghost btn-sm">📄 ブログ</button>
+            <button onclick="showScreen('reviewList')" class="btn btn-ghost btn-sm">🎬 レビュー</button>
             <button onclick="showScreen('settings')" class="btn btn-ghost btn-sm">⚙ 設定</button>
             <button onclick="doLogout()" class="btn btn-ghost btn-sm">ログアウト</button>
         </div>
@@ -98,6 +100,80 @@
                 <div style="display:flex;gap:10px;justify-content:flex-end;padding-top:8px;">
                     <button onclick="showScreen('list')" class="btn btn-outline">キャンセル</button>
                     <button onclick="savePost()" class="btn btn-primary" id="saveBtn">保存する</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Review List screen -->
+        <div id="reviewListScreen" class="admin-screen">
+            <div class="admin-card">
+                <div class="admin-card-header">
+                    <span class="admin-card-title">レビュー管理</span>
+                    <button onclick="showReviewEditor(null)" class="btn btn-primary btn-sm">＋ 新規追加</button>
+                </div>
+                <div class="tabs" style="margin-bottom:16px;">
+                    <button class="tab-btn active" data-rtab="filmarks" onclick="switchReviewTab('filmarks')">🎬 映画・アニメ</button>
+                    <button class="tab-btn" data-rtab="bookmeter" onclick="switchReviewTab('bookmeter')">📚 読書</button>
+                </div>
+                <div id="reviewList">
+                    <p style="color:var(--text-muted);text-align:center;padding:32px;">読み込み中...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Review Editor screen -->
+        <div id="reviewEditorScreen" class="admin-screen">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
+                <button onclick="showScreen('reviewList')" class="btn btn-outline btn-sm">← 一覧に戻る</button>
+                <h2 style="font-size:1.1em;font-weight:700;color:var(--primary-dark);" id="reviewEditorTitle">レビューを追加</h2>
+            </div>
+            <div id="reviewSaveAlert"></div>
+            <div class="admin-card">
+                <div class="tabs" style="margin-bottom:20px;">
+                    <button class="tab-btn active" id="reviewTypeFilmarks" onclick="setReviewType('filmarks')">🎬 映画・アニメ</button>
+                    <button class="tab-btn" id="reviewTypeBookmeter" onclick="setReviewType('bookmeter')">📚 読書</button>
+                </div>
+                <div class="form-row">
+                    <div class="form-group" style="flex:2;">
+                        <label class="form-label">タイトル <span style="color:#e53e3e;">*</span></label>
+                        <input type="text" id="reviewTitle" class="form-input" placeholder="作品タイトル">
+                    </div>
+                    <div class="form-group" id="reviewAuthorGroup">
+                        <label class="form-label">著者</label>
+                        <input type="text" id="reviewAuthor" class="form-input" placeholder="著者名">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">スコア（0〜5）</label>
+                        <div style="display:flex;align-items:center;gap:12px;">
+                            <input type="range" id="reviewScoreRange" min="0" max="5" step="0.5" value="3" oninput="document.getElementById('reviewScoreVal').textContent=this.value" style="flex:1;">
+                            <span id="reviewScoreVal" style="font-weight:700;color:var(--primary);min-width:24px;">3</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">日付</label>
+                        <input type="date" id="reviewDate" class="form-input">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">コメント</label>
+                    <textarea id="reviewComment" class="form-input" rows="3" placeholder="ひとことコメント（省略可）" style="resize:vertical;"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">画像URL（カバー・ポスター）</label>
+                        <input type="text" id="reviewImage" class="form-input" placeholder="https://...">
+                        <p class="form-hint">FilmarksやAmazonの画像URLを貼り付け</p>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">作品リンクURL</label>
+                        <input type="text" id="reviewUrl" class="form-input" placeholder="https://filmarks.com/...">
+                    </div>
+                </div>
+                <div style="display:flex;gap:10px;justify-content:flex-end;padding-top:8px;">
+                    <button onclick="showScreen('reviewList')" class="btn btn-outline">キャンセル</button>
+                    <button onclick="saveReview()" class="btn btn-primary" id="reviewSaveBtn">保存する</button>
                 </div>
             </div>
         </div>
@@ -549,6 +625,191 @@ function fmtDate(d) {
     if (!d) return '';
     return new Date(d).toLocaleDateString('ja-JP', { year:'numeric', month:'long', day:'numeric' });
 }
+
+// ===== Reviews =====
+const REVIEW_FILES = {
+    filmarks:  'data/filmarks.json',
+    bookmeter: 'data/bookmeter.json',
+};
+
+let currentReviewType = 'filmarks';
+let reviewCache = { filmarks: null, bookmeter: null };
+let reviewSha   = { filmarks: null, bookmeter: null };
+let editingReviewIndex = null;
+
+async function loadReviewData(type) {
+    try {
+        const file = await ghGet(REVIEW_FILES[type]);
+        reviewSha[type] = file.sha;
+        reviewCache[type] = JSON.parse(b64DecodeUtf8(file.content));
+    } catch (e) {
+        if (e.message.includes('404')) {
+            reviewCache[type] = { updated: null, reviews: [] };
+            reviewSha[type] = null;
+        } else { throw e; }
+    }
+    return reviewCache[type];
+}
+
+async function saveReviewData(type, data, message) {
+    const json = JSON.stringify(data, null, 2);
+    const result = await ghPut(REVIEW_FILES[type], json, reviewSha[type], message);
+    reviewSha[type] = result.content.sha;
+    reviewCache[type] = data;
+}
+
+function switchReviewTab(type) {
+    currentReviewType = type;
+    document.querySelectorAll('[data-rtab]').forEach(b => {
+        b.classList.toggle('active', b.dataset.rtab === type);
+    });
+    renderReviewList();
+}
+
+async function renderReviewList() {
+    const el = document.getElementById('reviewList');
+    el.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:24px;">読み込み中...</p>';
+    try {
+        const data = await loadReviewData(currentReviewType);
+        const reviews = data.reviews || [];
+        if (!reviews.length) {
+            el.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:32px;">レビューがまだありません</p>';
+            return;
+        }
+        el.innerHTML = reviews.map((r, i) => `
+            <div class="post-row">
+                ${r.image ? `<img src="${escHtml(r.image)}" style="width:44px;height:60px;object-fit:cover;border-radius:6px;flex-shrink:0;" onerror="this.style.display='none'">` : ''}
+                <div class="post-row-info">
+                    <div class="post-row-title">${escHtml(r.title)}${r.author ? ` <span style="font-weight:400;font-size:0.85em;color:var(--text-muted);">／ ${escHtml(r.author)}</span>` : ''}</div>
+                    <div class="post-row-meta">${r.date || ''} ／ ★${r.score || 0}</div>
+                </div>
+                <div class="post-row-actions">
+                    <button data-idx="${i}" data-action="edit"   class="btn btn-outline btn-sm">編集</button>
+                    <button data-idx="${i}" data-action="delete" class="btn btn-danger  btn-sm">削除</button>
+                </div>
+            </div>
+        `).join('');
+        el.querySelectorAll('button[data-action]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const idx = parseInt(btn.dataset.idx);
+                if (btn.dataset.action === 'edit')   showReviewEditor(idx);
+                if (btn.dataset.action === 'delete') deleteReview(idx);
+            });
+        });
+    } catch (e) {
+        el.innerHTML = `<p style="color:#e53e3e;text-align:center;padding:32px;">${escHtml(e.message)}</p>`;
+    }
+}
+
+function setReviewType(type) {
+    currentReviewType = type;
+    document.getElementById('reviewTypeFilmarks').classList.toggle('active', type === 'filmarks');
+    document.getElementById('reviewTypeBookmeter').classList.toggle('active', type === 'bookmeter');
+    document.getElementById('reviewAuthorGroup').style.display = type === 'bookmeter' ? '' : 'none';
+}
+
+function showReviewEditor(index) {
+    editingReviewIndex = index;
+    document.getElementById('reviewEditorTitle').textContent = index !== null ? 'レビューを編集' : 'レビューを追加';
+    document.getElementById('reviewSaveAlert').innerHTML = '';
+
+    setReviewType(currentReviewType);
+
+    // Reset
+    document.getElementById('reviewTitle').value   = '';
+    document.getElementById('reviewAuthor').value  = '';
+    document.getElementById('reviewScoreRange').value = '3';
+    document.getElementById('reviewScoreVal').textContent = '3';
+    document.getElementById('reviewDate').value    = new Date().toISOString().split('T')[0];
+    document.getElementById('reviewComment').value = '';
+    document.getElementById('reviewImage').value   = '';
+    document.getElementById('reviewUrl').value     = '';
+
+    if (index !== null && reviewCache[currentReviewType]) {
+        const r = reviewCache[currentReviewType].reviews[index];
+        if (r) {
+            document.getElementById('reviewTitle').value   = r.title   || '';
+            document.getElementById('reviewAuthor').value  = r.author  || '';
+            document.getElementById('reviewScoreRange').value = r.score || 0;
+            document.getElementById('reviewScoreVal').textContent = r.score || 0;
+            document.getElementById('reviewDate').value    = r.date    || '';
+            document.getElementById('reviewComment').value = r.comment || '';
+            document.getElementById('reviewImage').value   = r.image   || '';
+            document.getElementById('reviewUrl').value     = r.url     || '';
+        }
+    }
+
+    document.querySelectorAll('.admin-screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('reviewEditorScreen').classList.add('active');
+}
+
+async function saveReview() {
+    const title = document.getElementById('reviewTitle').value.trim();
+    if (!title) { showAlert('reviewSaveAlert', 'タイトルを入力してください', 'error'); return; }
+
+    const review = {
+        title,
+        author:  document.getElementById('reviewAuthor').value.trim(),
+        score:   parseFloat(document.getElementById('reviewScoreRange').value),
+        date:    document.getElementById('reviewDate').value,
+        comment: document.getElementById('reviewComment').value.trim(),
+        image:   document.getElementById('reviewImage').value.trim(),
+        url:     document.getElementById('reviewUrl').value.trim(),
+    };
+    if (currentReviewType === 'filmarks') delete review.author;
+
+    const btn = document.getElementById('reviewSaveBtn');
+    btn.disabled = true;
+    btn.textContent = '保存中...';
+
+    try {
+        let data = reviewCache[currentReviewType];
+        if (!data) data = await loadReviewData(currentReviewType);
+        const reviews = data.reviews || [];
+
+        if (editingReviewIndex !== null) {
+            reviews[editingReviewIndex] = review;
+        } else {
+            reviews.unshift(review); // 新規は先頭に追加
+        }
+
+        data.reviews = reviews;
+        data.updated = new Date().toISOString();
+        await saveReviewData(currentReviewType, data, `${editingReviewIndex !== null ? 'Update' : 'Add'} review: ${title}`);
+        showAlert('reviewSaveAlert', '保存しました ✓', 'success');
+        setTimeout(() => showScreen('reviewList'), 1200);
+    } catch (e) {
+        showAlert('reviewSaveAlert', '保存に失敗しました: ' + e.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '保存する';
+    }
+}
+
+async function deleteReview(index) {
+    if (!confirm('このレビューを削除しますか？')) return;
+    try {
+        const data = reviewCache[currentReviewType] || await loadReviewData(currentReviewType);
+        data.reviews.splice(index, 1);
+        data.updated = new Date().toISOString();
+        await saveReviewData(currentReviewType, data, `Delete review`);
+        await renderReviewList();
+    } catch (e) {
+        alert('削除に失敗しました: ' + e.message);
+    }
+}
+
+// ===== showScreen 拡張 =====
+const _origShowScreen = showScreen;
+showScreen = function(name) {
+    if (name === 'reviewList') {
+        document.querySelectorAll('.admin-screen').forEach(s => s.classList.remove('active'));
+        document.getElementById('reviewListScreen').classList.add('active');
+        renderReviewList();
+        return;
+    }
+    _origShowScreen(name);
+};
 
 // ===== Init =====
 function showAdmin() {
