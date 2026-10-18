@@ -1,6 +1,17 @@
 {
   "posts": [
     {
+      "id": "post-20261019-0107",
+      "slug": "post-20261019-0107",
+      "title": "テスト",
+      "date": "2026-10-19",
+      "tags": [
+        "テスト投稿"
+      ],
+      "summary": "テスト",
+      "content": "テスト"
+    },
+    {
       "id": "claude-code",
       "slug": "claude-code",
       "title": "Claude Codeで遊んでみた",
