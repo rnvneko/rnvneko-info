@@ -12,6 +12,17 @@
       "content": "テスト"
     },
     {
+      "id": "2",
+      "slug": "2",
+      "title": "テスト2",
+      "date": "2026-10-19",
+      "tags": [
+        "テスト投稿"
+      ],
+      "summary": "テストテスト",
+      "content": "テストテスト"
+    },
+    {
       "id": "claude-code",
       "slug": "claude-code",
       "title": "Claude Codeで遊んでみた",
