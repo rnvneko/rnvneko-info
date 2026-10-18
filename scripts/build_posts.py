@@ -6,7 +6,7 @@ Each Markdown file may start with a front matter block:
 
     ---
     title: 記事のタイトル
-    date: 2026-10-19
+    date: 2026-10-19 14:30  # the time is optional ("2026-10-19" works too); always Japan time, never converted
     tags: [AI, 日記]        # or "AI, 日記"
     summary: 一覧に出す要約
     slug: my-post           # optional, defaults to the file name
@@ -14,8 +14,11 @@ Each Markdown file may start with a front matter block:
     ---
 
 Without front matter the title is taken from the first "# heading" (or the file
-name), the date from the file's last commit date (or modification time) and the
-summary from the first paragraph.
+name), the date/time from the file's last commit (or modification time, in Japan
+time) and the summary from the first paragraph.
+
+posts.json keeps "date" as YYYY-MM-DD (older pages rely on it) and adds "time" as HH:MM
+("" when no time was given). Posts are sorted newest first by date, then time.
 
 Standard library only, so the workflow does not need to install anything.
 """
@@ -25,13 +28,14 @@ import re
 import subprocess
 import sys
 import unicodedata
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 POSTS_DIR = ROOT / "posts"
 OUT = ROOT / "data" / "posts.json"
 SUMMARY_LEN = 120
+JST = timezone(timedelta(hours=9))
 
 FRONT = re.compile(r"\A﻿?---[ \t]*\r?\n(.*?)\r?\n---[ \t]*(?:\r?\n|\Z)", re.S)
 
@@ -73,28 +77,36 @@ def slugify(name: str) -> str:
     return name.strip("-") or "post"
 
 
-def file_date(path: Path) -> str:
+def file_date(path: Path) -> tuple[str, str]:
+    """(date, time) of the last commit that touched the file, in Japan time; falls back to the mtime."""
     try:
         out = subprocess.run(
-            ["git", "log", "-1", "--format=%cs", "--", str(path)],
+            ["git", "log", "-1", "--format=%cI", "--", str(path)],
             cwd=ROOT, capture_output=True, text=True, check=True,
         ).stdout.strip()
         if out:
-            return out
+            dt = datetime.fromisoformat(out).astimezone(JST)
+            return dt.strftime("%Y-%m-%d"), dt.strftime("%H:%M")
     except Exception:
         pass
-    return datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc).strftime("%Y-%m-%d")
+    dt = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc).astimezone(JST)
+    return dt.strftime("%Y-%m-%d"), dt.strftime("%H:%M")
 
 
-def norm_date(v: str) -> str | None:
-    """Accepts 2026-10-19, 2026/10/19, 2026.10.19 (optionally followed by a time)."""
-    m = re.match(r"\s*(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})", unquote(v))
+def parse_datetime(v: str) -> tuple[str, str] | None:
+    """Accepts 2026-10-19 / 2026/10/19 / 2026.10.19, optionally followed by " 14:30" or "T14:30[:00]".
+    Returns (YYYY-MM-DD, "HH:MM" or ""). An invalid time is ignored; an invalid date gives None."""
+    m = re.match(r"\s*(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})(?:[ T]+(\d{1,2}):(\d{2}))?", unquote(v))
     if not m:
         return None
     try:
-        return datetime(int(m[1]), int(m[2]), int(m[3])).strftime("%Y-%m-%d")
+        date = datetime(int(m[1]), int(m[2]), int(m[3])).strftime("%Y-%m-%d")
     except ValueError:
         return None
+    time = ""
+    if m[4] is not None and int(m[4]) < 24 and int(m[5]) < 60:
+        time = "%02d:%s" % (int(m[4]), m[5])
+    return date, time
 
 
 def make_summary(body: str) -> str:
@@ -128,14 +140,16 @@ def build_post(path: Path) -> dict | None:
     if not title:
         title = path.stem
 
-    date = norm_date(meta["date"]) if meta.get("date") else None
+    parsed = parse_datetime(meta["date"]) if meta.get("date") else None
+    date, time = parsed if parsed else file_date(path)
     slug = slugify(unquote(meta.get("slug", "")) or path.stem)
 
     return {
         "id": slug,
         "slug": slug,
         "title": title,
-        "date": date or file_date(path),
+        "date": date,
+        "time": time,
         "tags": parse_tags(meta.get("tags")),
         # "summary:" written but left empty means "no summary"; leaving the key out auto-generates one.
         "summary": unquote(meta["summary"]) if "summary" in meta else make_summary(body),
@@ -168,7 +182,7 @@ def main() -> int:
         print("error: no posts found in posts/ (refusing to overwrite data/posts.json)", file=sys.stderr)
         return 1
 
-    posts.sort(key=lambda p: (p["date"], p["slug"]), reverse=True)
+    posts.sort(key=lambda p: (p["date"], p["time"] or "00:00", p["slug"]), reverse=True)
     OUT.parent.mkdir(parents=True, exist_ok=True)
     data = json.dumps({"posts": posts}, ensure_ascii=False, indent=2) + "\n"
     OUT.write_text(data, encoding="utf-8", newline="\n")
