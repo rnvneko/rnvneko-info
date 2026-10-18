@@ -7,6 +7,28 @@
     <link rel="shortcut icon" href="favicon.ico">
     <link href="https://fonts.googleapis.com/css2?family=Kosugi+Maru&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="stylesheet.css">
+    <style>
+        /* tag / archive filters and month headings (page-local, stylesheet.css is untouched) */
+        .filter-block { margin-bottom: 18px; }
+        .filter-label { font-size: 0.8em; font-weight: 700; color: var(--text-muted); margin: 0 0 8px; }
+        .tag-btn { cursor: pointer; border: none; font-family: inherit; }
+        .tag.active { background: var(--primary); color: #fff; }
+        .tag small { opacity: 0.7; margin-left: 4px; font-size: 0.85em; }
+        .archive-year { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+        .archive-year .year-chip { min-width: 78px; font-weight: 700; }
+        .result-info { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 4px 0 20px; font-size: 0.9em; color: var(--text-muted); }
+        .month-head {
+            grid-column: 1 / -1;
+            margin: 14px 0 0;
+            padding-bottom: 6px;
+            font-size: 1.15em;
+            color: var(--primary-dark);
+            border-bottom: 2px solid rgba(70, 130, 180, 0.2);
+        }
+        .month-head:first-child { margin-top: 0; }
+        .month-head small { margin-left: 8px; font-size: 0.7em; font-weight: 400; color: var(--text-muted); }
+        .post-time { margin-left: 6px; }
+    </style>
 </head>
 <body>
 
@@ -37,11 +59,19 @@
         <section class="section">
             <div class="container">
 
-                <!-- Search / Filter -->
-                <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:28px;align-items:center;">
+                <!-- Search / Filters -->
+                <div class="filter-block">
                     <input type="text" id="searchInput" class="form-input" placeholder="記事を検索..." style="max-width:300px;">
+                </div>
+                <div class="filter-block">
+                    <p class="filter-label">タグ</p>
                     <div id="tagFilter" class="post-tags" style="gap:8px;flex-wrap:wrap;"></div>
                 </div>
+                <div class="filter-block">
+                    <p class="filter-label">年月</p>
+                    <div id="archive"></div>
+                </div>
+                <div id="resultInfo" class="result-info"></div>
 
                 <div id="blog-posts" class="posts-grid">
                     <p class="state-msg">読み込み中...</p>
@@ -81,26 +111,42 @@
     function esc(s) {
         return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
+    // "2026-10-19" -> "2026年10月19日" (read from the string, so the viewer's time zone can never shift the day)
     function fmtDate(d) {
-        return new Date(d).toLocaleDateString('ja-JP', { year:'numeric', month:'long', day:'numeric' });
+        const m = String(d || '').match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+        return m ? `${m[1]}年${+m[2]}月${+m[3]}日` : String(d || '');
     }
+    const monthOf = p => String(p.date || '').slice(0, 7);                      // "2026-10"
+    const monthLabel = ym => { const [y, m] = ym.split('-'); return `${y}年${+m}月`; };
+    const sortKey = p => `${p.date || ''} ${p.time || '00:00'}`;                 // newest first by date, then time
 
     const PER_PAGE = 9;
     let allPosts = [];
     let currentTag = null;
+    let currentMonth = null;     // "2026-10" or "2026"
     let currentPage = 1;
     let searchQuery = '';
 
     function filteredPosts() {
+        const q = searchQuery.toLowerCase();
         return allPosts.filter(p => {
-            const matchTag = !currentTag || (p.tags || []).includes(currentTag);
-            const q = searchQuery.toLowerCase();
-            const matchSearch = !q ||
+            if (currentTag && !(p.tags || []).includes(currentTag)) return false;
+            if (currentMonth && !String(p.date || '').startsWith(currentMonth)) return false;
+            return !q ||
                 (p.title || '').toLowerCase().includes(q) ||
                 (p.summary || '').toLowerCase().includes(q) ||
                 (p.tags || []).some(t => t.toLowerCase().includes(q));
-            return matchTag && matchSearch;
         });
+    }
+
+    // keep the filters in the address bar so a filtered list can be shared / bookmarked
+    function writeUrl() {
+        const p = new URLSearchParams();
+        if (currentTag) p.set('tag', currentTag);
+        if (currentMonth) p.set('month', currentMonth);
+        if (searchQuery) p.set('q', searchQuery);
+        const qs = p.toString();
+        history.replaceState(null, '', qs ? `?${qs}` : location.pathname);
     }
 
     function renderPosts() {
@@ -111,19 +157,36 @@
         currentPage = Math.min(currentPage, totalPages);
         const slice = posts.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
 
+        // result line: what is filtered + how many + a reset button
+        const parts = [];
+        if (currentTag) parts.push(`タグ「${esc(currentTag)}」`);
+        if (currentMonth) parts.push(currentMonth.length === 4 ? `${currentMonth}年` : monthLabel(currentMonth));
+        if (searchQuery) parts.push(`検索「${esc(searchQuery)}」`);
+        document.getElementById('resultInfo').innerHTML = parts.length
+            ? `<span>${parts.join(' / ')} — ${total}件</span><button type="button" class="btn btn-outline btn-sm" data-clear="1">絞り込みを解除</button>`
+            : `<span>全${total}件</span>`;
+
         if (!slice.length) {
             el.innerHTML = '<p class="state-msg">記事が見つかりませんでした</p>';
         } else {
-            el.innerHTML = slice.map(p => `
+            const perMonth = {};
+            posts.forEach(p => { perMonth[monthOf(p)] = (perMonth[monthOf(p)] || 0) + 1; });
+            let lastMonth = null;
+            el.innerHTML = slice.map(p => {
+                const ym = monthOf(p);
+                const head = ym !== lastMonth && /^\d{4}-\d{2}$/.test(ym)
+                    ? `<h2 class="month-head">${monthLabel(ym)}<small>${perMonth[ym]}件</small></h2>` : '';
+                lastMonth = ym;
+                return `${head}
                 <a href="post.html?slug=${esc(p.slug)}" class="post-card glass-card fade-in">
                     <div class="post-meta">
-                        <span class="post-date">${fmtDate(p.date)}</span>
-                        <div class="post-tags">${(p.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div>
+                        <span class="post-date">${fmtDate(p.date)}${p.time ? `<span class="post-time">${esc(p.time)}</span>` : ''}</span>
+                        <div class="post-tags">${(p.tags||[]).map(t=>`<span class="tag" data-tag="${esc(t)}" title="このタグの記事を表示">${esc(t)}</span>`).join('')}</div>
                     </div>
                     <div class="post-title">${esc(p.title)}</div>
                     <div class="post-summary">${esc(p.summary||'')}</div>
-                </a>
-            `).join('');
+                </a>`;
+            }).join('');
             el.querySelectorAll('.fade-in').forEach(e => observer.observe(e));
         }
 
@@ -141,29 +204,70 @@
         window.scrollTo({ top: 200, behavior: 'smooth' });
     }
 
-    function renderTagFilter(posts) {
-        const tags = [...new Set(posts.flatMap(p => p.tags || []))].sort();
-        const el = document.getElementById('tagFilter');
-        el.innerHTML = tags.map(t => `
-            <button onclick="filterTag('${esc(t)}')" class="tag" id="tag-${esc(t)}" style="cursor:pointer;border:none;font-family:inherit;">${esc(t)}</button>
-        `).join('');
+    // Tags with their post counts, most used first
+    function renderTagFilter() {
+        const counts = {};
+        allPosts.forEach(p => (p.tags || []).forEach(t => { counts[t] = (counts[t] || 0) + 1; }));
+        const tags = Object.keys(counts).sort((a, b) => counts[b] - counts[a] || a.localeCompare(b, 'ja'));
+        document.getElementById('tagFilter').innerHTML = tags.length
+            ? tags.map(t => `<button type="button" class="tag tag-btn${t === currentTag ? ' active' : ''}" data-tag="${esc(t)}">${esc(t)}<small>${counts[t]}</small></button>`).join('')
+            : '<span style="color:var(--text-muted);font-size:0.9em;">タグはまだありません</span>';
     }
 
-    function filterTag(tag) {
-        currentTag = currentTag === tag ? null : tag;
-        currentPage = 1;
-        document.querySelectorAll('#tagFilter .tag').forEach(el => {
-            const isActive = el.textContent === currentTag;
-            el.style.background = isActive ? 'var(--primary)' : '';
-            el.style.color = isActive ? 'white' : '';
+    // Year -> months archive with counts
+    function renderArchive() {
+        const years = {};
+        allPosts.forEach(p => {
+            const ym = monthOf(p);
+            if (!/^\d{4}-\d{2}$/.test(ym)) return;
+            const y = ym.slice(0, 4);
+            years[y] = years[y] || { n: 0, months: {} };
+            years[y].n++;
+            years[y].months[ym] = (years[y].months[ym] || 0) + 1;
         });
-        renderPosts();
+        const html = Object.keys(years).sort().reverse().map(y => {
+            const months = Object.keys(years[y].months).sort().reverse().map(ym =>
+                `<button type="button" class="tag tag-btn${ym === currentMonth ? ' active' : ''}" data-month="${ym}">${+ym.slice(5)}月<small>${years[y].months[ym]}</small></button>`).join('');
+            return `<div class="archive-year">
+                <button type="button" class="tag tag-btn year-chip${y === currentMonth ? ' active' : ''}" data-month="${y}">${y}年<small>${years[y].n}</small></button>${months}
+            </div>`;
+        }).join('');
+        document.getElementById('archive').innerHTML = html || '<span style="color:var(--text-muted);font-size:0.9em;">まだ記事がありません</span>';
     }
+
+    function refresh() {
+        currentPage = 1;
+        renderTagFilter();
+        renderArchive();
+        renderPosts();
+        writeUrl();
+    }
+
+    // one click handler for tag buttons, tags inside cards, archive chips and the reset button
+    document.addEventListener('click', e => {
+        const tagEl = e.target.closest('[data-tag]');
+        const monthEl = e.target.closest('[data-month]');
+        if (tagEl) {
+            e.preventDefault();                      // a tag inside a card must not open the post
+            const t = tagEl.dataset.tag;
+            currentTag = currentTag === t ? null : t;
+            refresh();
+        } else if (monthEl) {
+            const m = monthEl.dataset.month;
+            currentMonth = currentMonth === m ? null : m;
+            refresh();
+        } else if (e.target.closest('[data-clear]')) {
+            currentTag = null; currentMonth = null; searchQuery = '';
+            document.getElementById('searchInput').value = '';
+            refresh();
+        }
+    });
 
     document.getElementById('searchInput').addEventListener('input', e => {
         searchQuery = e.target.value;
         currentPage = 1;
         renderPosts();
+        writeUrl();
     });
 
     async function init() {
@@ -172,8 +276,18 @@
             const res = await fetch('data/posts.json');
             if (!res.ok) throw new Error();
             const data = await res.json();
-            allPosts = (data.posts || []).sort((a,b) => new Date(b.date) - new Date(a.date));
-            renderTagFilter(allPosts);
+            allPosts = (data.posts || []).sort((a, b) => sortKey(b).localeCompare(sortKey(a)));
+
+            // filters from the address bar: ?tag=AI&month=2026-10&q=word
+            const params = new URLSearchParams(location.search);
+            currentTag = params.get('tag') || null;
+            const m = params.get('month');
+            currentMonth = m && /^\d{4}(-\d{2})?$/.test(m) ? m : null;
+            searchQuery = params.get('q') || '';
+            document.getElementById('searchInput').value = searchQuery;
+
+            renderTagFilter();
+            renderArchive();
             renderPosts();
         } catch {
             el.innerHTML = '<p class="state-msg">記事の読み込みに失敗しました</p>';
