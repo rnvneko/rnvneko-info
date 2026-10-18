@@ -13,7 +13,7 @@
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
     <!-- highlight.js for code blocks -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 </head>
 <body>
 
@@ -89,8 +89,12 @@
     // Custom renderer for code blocks
     const renderer = new marked.Renderer();
     renderer.code = function(code, lang) {
-        const language = hljs.getLanguage(lang) ? lang : 'plaintext';
-        const highlighted = hljs.highlight(typeof code === 'object' ? code.text : code, { language }).value;
+        const text = typeof code === 'object' ? code.text : code;
+        // hljs may be missing (CDN blocked/unavailable): fall back to plain escaped text instead of breaking the whole post
+        const language = (window.hljs && lang && hljs.getLanguage(lang)) ? lang : 'plaintext';
+        let highlighted;
+        try { highlighted = window.hljs ? hljs.highlight(text, { language }).value : null; } catch (e) { highlighted = null; }
+        if (highlighted === null) highlighted = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         return `<pre><code class="hljs language-${language}">${highlighted}</code></pre>`;
     };
 
