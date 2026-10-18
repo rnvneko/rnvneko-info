@@ -76,8 +76,10 @@
         return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
+    // "2026-10-19" -> "2026年10月19日" (read from the string, so the viewer's time zone can never shift the day)
     function fmtDate(d) {
-        return new Date(d).toLocaleDateString('ja-JP', { year:'numeric', month:'long', day:'numeric' });
+        const m = String(d || '').match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+        return m ? `${m[1]}年${+m[2]}月${+m[3]}日` : String(d || '');
     }
 
     // Configure marked
@@ -127,9 +129,13 @@
             const hero = document.getElementById('post-hero');
             hero.style.display = 'block';
 
-            document.getElementById('post-tags').innerHTML = (post.tags || []).map(t => `<span class="tag">${esc(t)}</span>`).join('');
+            // tags and the month link jump to the blog list filtered by that tag / year-month
+            document.getElementById('post-tags').innerHTML = (post.tags || []).map(t =>
+                `<a class="tag" href="blog.html?tag=${encodeURIComponent(t)}" style="text-decoration:none;">${esc(t)}</a>`).join('');
             document.getElementById('post-title').textContent = post.title;
-            document.getElementById('post-date').textContent = fmtDate(post.date);
+            document.getElementById('post-date').innerHTML =
+                `<a href="blog.html?month=${esc(String(post.date || '').slice(0, 7))}" style="color:inherit;text-decoration:underline;">${esc(fmtDate(post.date))}</a>` +
+                (post.time ? ` ${esc(post.time)}` : '');
 
             // Body - DOMPurify で XSS を無害化してからレンダリング
             const rawHtml = marked.parse(post.content || '');
