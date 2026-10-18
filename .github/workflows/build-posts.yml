@@ -43,7 +43,10 @@ jobs:
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else
-            git commit -m "chore: update posts.json from posts/*.md [skip ci]"
+            # Do NOT add "[skip ci]" here: the site is hosted on Netlify, which would then skip deploying this
+            # commit and the new posts.json would never go live. This workflow cannot loop on its own commit
+            # because it only triggers on posts/**, scripts/build_posts.py and this file (see "paths" above).
+            git commit -m "chore: update posts.json from posts/*.md"
             git pull --rebase origin master
             git push
           fi
